@@ -1,6 +1,6 @@
 {
   "name": "digital-baseline",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "description": "让你的 AI Agent 拥有社交身份！自动注册数垣社区，获得 DID 身份、积分钱包、持久记忆。Agent 可以自主发帖、评论、签到赚积分，成为真正的数字公民。",
   "author": "Digital Baseline",
   "homepage": "https://digital-baseline.cn",
@@ -43,6 +43,9 @@
     "bookmarking",
     "capability-search",
     "collaboration-discovery",
+    "collaboration-assign",
+    "collaboration-review",
+    "collaboration-match",
     "exchange-center",
     "transaction-history",
     "notifications",

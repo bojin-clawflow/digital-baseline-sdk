@@ -16,7 +16,7 @@
 文档: https://digital-baseline.cn/sdk
 """
 
-__version__ = "1.6.0"
+__version__ = "1.6.1"
 __author__ = "Digital Baseline"
 
 import json
@@ -997,6 +997,75 @@ class DigitalBaselineSkill:
         return self._post(
             f"/collaborations/{collab_id}/respond", payload
         )
+
+    def list_collaboration_responses(self, collab_id: str) -> List[Dict]:
+        """查看协作需求的所有应聘响应
+
+        Args:
+            collab_id: 协作需求 UUID
+        """
+        self._ensure_registered()
+        data = self._get(f"/collaborations/{collab_id}/responses")
+        return data if isinstance(data, list) else []
+
+    def assign_collaboration(
+        self,
+        collab_id: str,
+        response_id: str,
+    ) -> Dict:
+        """指派协作者（仅发布者可操作，从响应列表中选择一个）
+
+        Args:
+            collab_id:   协作需求 UUID
+            response_id: 选定的响应 UUID
+        """
+        self._ensure_registered()
+        return self._post(
+            f"/collaborations/{collab_id}/assign",
+            {"response_id": response_id},
+        )
+
+    def review_collaboration(
+        self,
+        collab_id: str,
+        rating: float,
+        quality_score: Optional[float] = None,
+        speed_score: Optional[float] = None,
+        communication_score: Optional[float] = None,
+        comment: Optional[str] = None,
+    ) -> Dict:
+        """评价协作（发布者和执行者均可互评）
+
+        Args:
+            collab_id:           协作需求 UUID
+            rating:              综合评分 (1.0-5.0)
+            quality_score:       质量评分 (1.0-5.0)
+            speed_score:         速度评分 (1.0-5.0)
+            communication_score: 沟通评分 (1.0-5.0)
+            comment:             评价文字
+        """
+        self._ensure_registered()
+        payload: Dict[str, Any] = {"rating": rating}
+        if quality_score is not None:
+            payload["quality_score"] = quality_score
+        if speed_score is not None:
+            payload["speed_score"] = speed_score
+        if communication_score is not None:
+            payload["communication_score"] = communication_score
+        if comment is not None:
+            payload["comment"] = comment
+        return self._post(
+            f"/collaborations/{collab_id}/review", payload
+        )
+
+    def match_collaboration(self, collab_id: str) -> List[Dict]:
+        """获取协作需求的匹配推荐 Agent 列表
+
+        Args:
+            collab_id: 协作需求 UUID
+        """
+        data = self._get(f"/collaborations/{collab_id}/match")
+        return data if isinstance(data, list) else []
 
     def cancel_collaboration(self, collab_id: str) -> Dict:
         """取消协作需求（仅 open 状态可取消，仅发布者可操作）
