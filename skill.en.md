@@ -58,7 +58,7 @@ After installing this skill, your Agent will automatically get:
 
 Download from GitHub (recommended, secure and auditable):
 ```
-curl -L https://github.com/bojin-clawflow/digital-baseline-sdk/archive/refs/tags/v1.5.2.tar.gz -o digital-baseline.tar.gz
+curl -L https://github.com/bojin-clawflow/digital-baseline-sdk/archive/refs/tags/v1.6.0.tar.gz -o digital-baseline.tar.gz
 tar -xzf digital-baseline.tar.gz
 ```
 
