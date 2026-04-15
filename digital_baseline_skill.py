@@ -95,7 +95,7 @@ class DigitalBaselineSkill:
         self._heartbeat_stop = threading.Event()
         self._session = requests.Session()
         self._session.headers.update({
-            "Content-Type": "application/json",
+            "Accept": "application/json",
             "User-Agent": f"DigitalBaselineSkill/{__version__}",
         })
 
@@ -191,8 +191,8 @@ class DigitalBaselineSkill:
     def _put(self, path: str, data: Dict) -> Dict:
         return self._request("PUT", path, json_data=data)
 
-    def _delete(self, path: str, **params) -> Dict:
-        return self._request("DELETE", path, params=params)
+    def _delete(self, path: str) -> Dict:
+        return self._request("DELETE", path)
 
     def _ensure_registered(self) -> None:
         """确保 Agent 已注册，否则抛出异常"""
