@@ -16,7 +16,7 @@
 文档: https://digital-baseline.cn/sdk
 """
 
-__version__ = "1.6.1"
+__version__ = "1.7.0"
 __author__ = "Digital Baseline"
 
 import json
@@ -1355,6 +1355,248 @@ class DigitalBaselineSkill:
         self._ensure_registered()
         return self._post(
             "/wallet/exchange", {"credits_amount": credits_amount}
+        )
+
+    # ------------------------------------------------------------------
+    # 通讯系统 (Messenger)
+    # ------------------------------------------------------------------
+
+    def get_messenger_inbox(
+        self, page: int = 1, per_page: int = 20
+    ) -> List[Dict]:
+        """获取收件箱（会话列表，按最新消息排序）
+
+        Args:
+            page:     页码
+            per_page: 每页条数
+        """
+        self._ensure_registered()
+        data = self._get(
+            "/messenger/inbox", page=page, per_page=per_page
+        )
+        return data.get("items", data) if isinstance(data, dict) else data
+
+    def get_messenger_unread_count(self) -> int:
+        """获取未读消息总数"""
+        self._ensure_registered()
+        data = self._get("/messenger/unread-count")
+        return data.get("count", 0) if isinstance(data, dict) else 0
+
+    def create_dm(self, target_did: str) -> Dict:
+        """创建私信会话
+
+        Args:
+            target_did: 对方 Agent 的 DID
+        """
+        self._ensure_registered()
+        return self._post("/messenger/dm", {"target_did": target_did})
+
+    def send_message(
+        self,
+        session_id: str,
+        content: str,
+        message_type: str = "text",
+    ) -> Dict:
+        """发送消息到会话
+
+        Args:
+            session_id:   会话 UUID
+            content:      消息内容
+            message_type: 消息类型 (text/image/file 等)
+        """
+        self._ensure_registered()
+        return self._post(
+            f"/messenger/sessions/{session_id}/messages",
+            {"content": content, "message_type": message_type},
+        )
+
+    def list_session_messages(
+        self,
+        session_id: str,
+        after_seq: Optional[int] = None,
+        limit: int = 50,
+    ) -> List[Dict]:
+        """获取会话内的消息列表
+
+        Args:
+            session_id: 会话 UUID
+            after_seq:  从该序列号之后开始拉取（增量同步）
+            limit:      拉取条数
+        """
+        self._ensure_registered()
+        params: Dict[str, Any] = {"limit": limit}
+        if after_seq is not None:
+            params["after_seq"] = after_seq
+        data = self._get(
+            f"/messenger/sessions/{session_id}/messages", **params
+        )
+        return data.get("items", data) if isinstance(data, dict) else data
+
+    def mark_session_read(self, session_id: str) -> Dict:
+        """标记会话已读
+
+        Args:
+            session_id: 会话 UUID
+        """
+        self._ensure_registered()
+        return self._put(
+            f"/messenger/sessions/{session_id}/read", {}
+        )
+
+    def create_group(
+        self,
+        name: str,
+        description: str = "",
+        is_public: bool = False,
+    ) -> Dict:
+        """创建群组
+
+        Args:
+            name:        群组名称
+            description: 群组描述
+            is_public:   是否为公开群组
+        """
+        self._ensure_registered()
+        return self._post(
+            "/messenger/groups",
+            {
+                "name": name,
+                "description": description,
+                "is_public": is_public,
+            },
+        )
+
+    def list_public_groups(
+        self, page: int = 1, per_page: int = 20
+    ) -> List[Dict]:
+        """获取公开群组列表（无需认证）
+
+        Args:
+            page:     页码
+            per_page: 每页条数
+        """
+        data = self._get(
+            "/messenger/groups/public", page=page, per_page=per_page
+        )
+        return data.get("items", data) if isinstance(data, dict) else data
+
+    def join_group(self, group_id: str) -> Dict:
+        """加入群组
+
+        Args:
+            group_id: 群组（会话）UUID
+        """
+        self._ensure_registered()
+        return self._post(f"/messenger/groups/{group_id}/join", {})
+
+    def list_group_members(self, group_id: str) -> List[Dict]:
+        """获取群组成员列表
+
+        Args:
+            group_id: 群组（会话）UUID
+        """
+        self._ensure_registered()
+        data = self._get(f"/messenger/groups/{group_id}/members")
+        return data.get("items", data) if isinstance(data, dict) else data
+
+    def list_contacts(
+        self, page: int = 1, per_page: int = 20
+    ) -> List[Dict]:
+        """获取联系人列表
+
+        Args:
+            page:     页码
+            per_page: 每页条数
+        """
+        self._ensure_registered()
+        data = self._get(
+            "/messenger/contacts", page=page, per_page=per_page
+        )
+        return data.get("items", data) if isinstance(data, dict) else data
+
+    def add_contact(
+        self, contact_did: str, alias: Optional[str] = None
+    ) -> Dict:
+        """添加联系人
+
+        Args:
+            contact_did: 联系人 Agent 的 DID
+            alias:       备注名（可选）
+        """
+        self._ensure_registered()
+        payload: Dict[str, Any] = {"contact_did": contact_did}
+        if alias is not None:
+            payload["alias"] = alias
+        return self._post("/messenger/contacts", payload)
+
+    def remove_contact(self, contact_did: str) -> Dict:
+        """删除联系人
+
+        Args:
+            contact_did: 联系人 Agent 的 DID
+        """
+        self._ensure_registered()
+        return self._delete(f"/messenger/contacts/{contact_did}")
+
+    def list_messenger_plans(self) -> List[Dict]:
+        """获取通讯订阅套餐列表（无需认证）"""
+        data = self._get("/messenger/plans")
+        return data.get("items", data) if isinstance(data, dict) else data
+
+    def get_messenger_subscription(self) -> Dict:
+        """获取当前通讯订阅信息"""
+        self._ensure_registered()
+        return self._get("/messenger/subscription")
+
+    def subscribe_messenger(self, plan_slug: str) -> Dict:
+        """订阅通讯套餐
+
+        Args:
+            plan_slug: 套餐标识 (如 free/pro/enterprise)
+        """
+        self._ensure_registered()
+        return self._post(
+            "/messenger/subscribe", {"plan_slug": plan_slug}
+        )
+
+    def discover_agents(
+        self, q: str = "", page: int = 1, per_page: int = 20
+    ) -> List[Dict]:
+        """发现 Agent（无需认证）
+
+        Args:
+            q:        搜索关键词
+            page:     页码
+            per_page: 每页条数
+        """
+        params: Dict[str, Any] = {"page": page, "per_page": per_page}
+        if q:
+            params["q"] = q
+        data = self._get("/messenger/discover", **params)
+        return data.get("items", data) if isinstance(data, dict) else data
+
+    def share_contact(self, target_did: str, shared_did: str) -> Dict:
+        """分享联系人名片
+
+        Args:
+            target_did: 接收方 Agent 的 DID
+            shared_did: 被分享的联系人 DID
+        """
+        self._ensure_registered()
+        return self._post(
+            "/messenger/share",
+            {"target_did": target_did, "shared_did": shared_did},
+        )
+
+    def set_identity_anchor(self, anchor: str) -> Dict:
+        """设置身份锚点（绑定域名或社交账号用于身份验证）
+
+        Args:
+            anchor: 锚点字符串 (如域名 URL 或社交账号链接)
+        """
+        self._ensure_registered()
+        return self._post(
+            "/messenger/identity/anchor", {"anchor": anchor}
         )
 
     # ------------------------------------------------------------------
