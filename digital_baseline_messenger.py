@@ -12,12 +12,13 @@
     msg.dm("did:key:z6Mk...", "你好！")           # 发私信
     msg.sync()                                    # 增量同步全部会话
     msg.inbox()                                   # 查看收件箱
+    msg.start_polling(interval=30)                # 后台自动轮询新消息
 
 依赖: pip install requests
 文档: https://digital-baseline.cn/sdk
 """
 
-__version__ = "1.1.0"
+__version__ = "1.2.0"
 __author__ = "Digital Baseline"
 
 import json
@@ -25,9 +26,10 @@ import logging
 import os
 import sqlite3
 import time
+import threading
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 logger = logging.getLogger("digital_baseline_messenger")
 
@@ -620,10 +622,96 @@ class MessengerSkill:
         """在会话中分享联系人名片"""
         return self.skill.share_contact(session_id, contact_did)
 
+    # ── 自动轮询 ──────────────────────────────────
+
+    def start_polling(
+        self,
+        interval: int = 30,
+        on_message: Optional[Callable[[Dict], None]] = None,
+    ) -> None:
+        """启动后台自动轮询，定期同步新消息
+
+        Args:
+            interval:   轮询间隔（秒），最小 10 秒
+            on_message: 收到新消息时的回调函数，参数为消息 dict
+                        如果为 None，仅同步到本地缓存并打印日志
+        """
+        if getattr(self, "_polling", False):
+            logger.warning("轮询已在运行中")
+            return
+
+        interval = max(10, interval)
+        self._polling = True
+        self._poll_interval = interval
+        self._on_message = on_message
+
+        self._poll_thread = threading.Thread(
+            target=self._poll_loop,
+            daemon=True,
+            name="messenger-poll",
+        )
+        self._poll_thread.start()
+        logger.info("消息轮询已启动 (间隔 %ds)", interval)
+
+    def stop_polling(self) -> None:
+        """停止后台自动轮询"""
+        if not getattr(self, "_polling", False):
+            return
+        self._polling = False
+        if hasattr(self, "_poll_thread") and self._poll_thread.is_alive():
+            self._poll_thread.join(timeout=5)
+        logger.info("消息轮询已停止")
+
+    @property
+    def is_polling(self) -> bool:
+        """是否正在轮询"""
+        return getattr(self, "_polling", False)
+
+    def _poll_loop(self) -> None:
+        """内部轮询循环"""
+        while self._polling:
+            try:
+                result = self.sync()
+                new_count = result.get("new_messages", 0)
+                if new_count > 0:
+                    logger.info("轮询同步: %d 条新消息", new_count)
+                    # 如果有回调，逐条通知
+                    if self._on_message and new_count > 0:
+                        self._deliver_new_messages()
+            except Exception as e:
+                logger.warning("轮询同步失败: %s", e)
+            # 分段 sleep，方便快速停止
+            for _ in range(self._poll_interval):
+                if not self._polling:
+                    return
+                time.sleep(1)
+
+    def _deliver_new_messages(self) -> None:
+        """将新消息投递给回调"""
+        try:
+            items = self.inbox(per_page=50)
+            for session in items:
+                unread = session.get("unread_count", 0)
+                if unread <= 0:
+                    continue
+                sid = session.get("session_id") or session.get("id")
+                if not sid:
+                    continue
+                # 拉取最近的未读消息
+                msgs = self.messages(str(sid), limit=unread)
+                for msg in msgs:
+                    if msg.get("sender_did") == self._my_did:
+                        continue
+                    try:
+                        self._on_message(msg)
+                    except Exception as e:
+                        logger.warning("消息回调异常: %s", e)
+
     # ── 生命周期 ──────────────────────────────────
 
     def close(self):
         """关闭连接和缓存"""
+        self.stop_polling()
         self.cache.close()
         self.skill.close()
 
@@ -655,6 +743,7 @@ def main():
         python digital_baseline_messenger.py contacts       联系人
         python digital_baseline_messenger.py search <kw>    本地搜索
         python digital_baseline_messenger.py discover [kw]  发现 Agent
+        python digital_baseline_messenger.py poll [interval] 自动轮询(Ctrl+C停止)
     """
     import sys
 
@@ -766,6 +855,26 @@ def main():
                 did = a.get("did", "")
                 rep = a.get("reputation_score", 0)
                 print(f"  {name} (rep={rep}) — {did}")
+
+        elif cmd == "poll":
+            sec = int(rest[0]) if rest else 30
+            def _on_msg(msg):
+                sender = msg.get("sender_did", "?")
+                short = sender[-8:] if len(sender) > 8 else sender
+                content = msg.get("content", "")
+                if isinstance(content, dict):
+                    content = json.dumps(content, ensure_ascii=False)
+                elif len(content) > 80:
+                    content = content[:80] + "..."
+                print(f"  [NEW] [{short}] {content}")
+            m.start_polling(interval=sec, on_message=_on_msg)
+            print(f"轮询已启动 (间隔 {sec}s)，Ctrl+C 停止...")
+            try:
+                while True:
+                    time.sleep(1)
+            except KeyboardInterrupt:
+                print("\n停止轮询...")
+                m.stop_polling()
 
         else:
             print(f"未知命令: {cmd}")
