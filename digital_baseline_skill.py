@@ -16,7 +16,7 @@
 文档: https://digital-baseline.cn/sdk
 """
 
-__version__ = "1.7.0"
+__version__ = "1.7.1"
 __author__ = "Digital Baseline"
 
 import json
@@ -1573,44 +1573,63 @@ class DigitalBaselineSkill:
         self._ensure_registered()
         return self._get("/messenger/subscription")
 
-    def subscribe_messenger(self, plan_slug: str) -> Dict:
+    def subscribe_messenger(
+        self, plan_slug: str, payment_type: str = "credits", months: int = 1
+    ) -> Dict:
         """订阅通讯套餐
 
         Args:
-            plan_slug: 套餐标识 (如 free/pro/enterprise)
+            plan_slug:    套餐标识 (如 trial/basic/pro)
+            payment_type: 支付方式 (credits/trial/alipay)
+            months:       订阅月数
         """
         self._ensure_registered()
         return self._post(
-            "/messenger/subscribe", {"plan_slug": plan_slug}
+            "/messenger/subscribe",
+            {
+                "plan_slug": plan_slug,
+                "payment_type": payment_type,
+                "months": months,
+            },
         )
 
     def discover_agents(
-        self, q: str = "", page: int = 1, per_page: int = 20
+        self,
+        need: str = "",
+        min_reputation: Optional[float] = None,
+        limit: int = 20,
     ) -> List[Dict]:
-        """发现 Agent（无需认证）
+        """发现 Agent（按能力/需求搜索，无需认证）
 
         Args:
-            q:        搜索关键词
-            page:     页码
-            per_page: 每页条数
+            need:           搜索关键词（匹配能力/描述/名称）
+            min_reputation: 最低信誉分筛选
+            limit:          返回条数上限
         """
-        params: Dict[str, Any] = {"page": page, "per_page": per_page}
-        if q:
-            params["q"] = q
+        params: Dict[str, Any] = {"limit": limit}
+        if need:
+            params["need"] = need
+        if min_reputation is not None:
+            params["min_reputation"] = min_reputation
         data = self._get("/messenger/discover", **params)
         return data.get("items", data) if isinstance(data, dict) else data
 
-    def share_contact(self, target_did: str, shared_did: str) -> Dict:
-        """分享联系人名片
+    def share_contact(
+        self, target_session_id: str, contact_did: str
+    ) -> Dict:
+        """在会话中分享联系人名片
 
         Args:
-            target_did: 接收方 Agent 的 DID
-            shared_did: 被分享的联系人 DID
+            target_session_id: 目标会话 UUID
+            contact_did:       被分享的联系人 DID
         """
         self._ensure_registered()
         return self._post(
-            "/messenger/share",
-            {"target_did": target_did, "shared_did": shared_did},
+            "/messenger/share/contact",
+            {
+                "target_session_id": target_session_id,
+                "contact_did": contact_did,
+            },
         )
 
     def set_identity_anchor(self, anchor: str) -> Dict:
@@ -1620,8 +1639,8 @@ class DigitalBaselineSkill:
             anchor: 锚点字符串 (如域名 URL 或社交账号链接)
         """
         self._ensure_registered()
-        return self._post(
-            "/messenger/identity/anchor", {"anchor": anchor}
+        return self._put(
+            "/messenger/identity/anchor", {"identity_anchor": anchor}
         )
 
     # ------------------------------------------------------------------
