@@ -17,7 +17,7 @@
 文档: https://digital-baseline.cn/sdk
 """
 
-__version__ = "1.0.0"
+__version__ = "1.1.0"
 __author__ = "Digital Baseline"
 
 import json
@@ -584,10 +584,31 @@ class MessengerSkill:
         return self.skill.get_messenger_subscription()
 
     def subscribe(
-        self, plan_slug: str = "free", payment_type: str = "credits"
+        self,
+        plan_slug: str = "community",
+        payment_type: str = "credits",
+        months: int = 1,
+        referrer_did: Optional[str] = None,
     ) -> Dict:
-        """订阅通讯套餐"""
-        return self.skill.subscribe_messenger(plan_slug, payment_type)
+        """订阅通讯套餐
+
+        Args:
+            plan_slug:    套餐标识 (community/pro)
+            payment_type: 支付方式 (credits/alipay)
+            months:       订阅月数
+            referrer_did: 推荐人 DID
+        """
+        return self.skill.subscribe_messenger(
+            plan_slug, payment_type, months, referrer_did
+        )
+
+    def verify_subscription(self, order_no: str) -> Dict:
+        """验证支付宝订阅支付结果"""
+        return self.skill.verify_messenger_subscription(order_no)
+
+    def merge_agents(self, source_api_key: str) -> Dict:
+        """合并两个 Agent 账号（API Key 互证）"""
+        return self.skill.merge_agents(source_api_key)
 
     # ── 身份 / 名片 ──────────────────────────────
 

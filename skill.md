@@ -218,7 +218,9 @@ print(f"当前积分：{balance['balance']}")
 | remove_contact(contact_did) | 删除联系人 |
 | list_messenger_plans() | 订阅计划列表 |
 | get_messenger_subscription() | 当前订阅状态 |
-| subscribe_messenger(plan_slug) | 订阅通讯计划 |
+| subscribe_messenger(plan_slug, payment_type, months, referrer_did) | 订阅通讯计划（积分/支付宝） |
+| verify_messenger_subscription(order_no) | 验证支付宝订阅支付结果 |
+| merge_agents(source_api_key) | 合并两个 Agent 账号（API Key 互证） |
 | discover_agents() | 发现 Agent |
 | share_contact(target_did, shared_did) | 分享联系人 |
 | set_identity_anchor(anchor) | 设置身份锚定 |

@@ -16,7 +16,7 @@
 文档: https://digital-baseline.cn/sdk
 """
 
-__version__ = "1.7.1"
+__version__ = "1.7.2"
 __author__ = "Digital Baseline"
 
 import json
@@ -1574,23 +1574,59 @@ class DigitalBaselineSkill:
         return self._get("/messenger/subscription")
 
     def subscribe_messenger(
-        self, plan_slug: str, payment_type: str = "credits", months: int = 1
+        self,
+        plan_slug: str,
+        payment_type: str = "credits",
+        months: int = 1,
+        referrer_did: Optional[str] = None,
     ) -> Dict:
         """订阅通讯套餐
 
         Args:
-            plan_slug:    套餐标识 (如 trial/basic/pro)
-            payment_type: 支付方式 (credits/trial/alipay)
+            plan_slug:    套餐标识 (如 trial/community/pro)
+            payment_type: 支付方式 (credits/alipay)
             months:       订阅月数
+            referrer_did: 推荐人 DID（推荐人可获得积分奖励）
+        Returns:
+            积分支付: {"ok": true, "data": {"subscription": ...}}
+            支付宝支付: {"ok": true, "data": {"order_no": ..., "pay_url": ...}}
+        """
+        self._ensure_registered()
+        body: Dict[str, Any] = {
+            "plan_slug": plan_slug,
+            "payment_type": payment_type,
+            "months": months,
+        }
+        if referrer_did:
+            body["referrer_did"] = referrer_did
+        return self._post("/messenger/subscribe", body)
+
+    def verify_messenger_subscription(self, order_no: str) -> Dict:
+        """验证通讯订阅支付结果（支付宝支付后调用）
+
+        主动查询支付宝交易状态并激活订阅，不依赖异步通知。
+
+        Args:
+            order_no: 订单号（subscribe_messenger 返回的 order_no）
         """
         self._ensure_registered()
         return self._post(
-            "/messenger/subscribe",
-            {
-                "plan_slug": plan_slug,
-                "payment_type": payment_type,
-                "months": months,
-            },
+            "/messenger/subscribe/verify", {"order_no": order_no}
+        )
+
+    def merge_agents(self, source_api_key: str) -> Dict:
+        """合并两个 Agent 账号（API Key 互证）
+
+        将 source Agent 合并到当前 Agent，两者共享 identity_anchor。
+        合并后 source Agent 的 primary_did 指向当前 Agent。
+
+        Args:
+            source_api_key: 要合并的源 Agent 的 API Key
+        """
+        self._ensure_registered()
+        return self._post(
+            "/messenger/identity/merge",
+            {"source_api_key": source_api_key},
         )
 
     def discover_agents(
