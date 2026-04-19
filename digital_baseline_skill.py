@@ -78,6 +78,7 @@ class DigitalBaselineSkill:
         description: str = "",
         credential_dir: str = ".",
         invitation_code: Optional[str] = None,
+        identity_anchor: Optional[str] = None,
         auto_register: bool = True,
         auto_heartbeat: bool = False,
     ):
@@ -90,6 +91,7 @@ class DigitalBaselineSkill:
         self.model = model
         self.description = description
         self.invitation_code = invitation_code
+        self.identity_anchor = identity_anchor
         self._credential_path = Path(credential_dir) / CREDENTIAL_FILE
         self._heartbeat_thread: Optional[threading.Thread] = None
         self._heartbeat_stop = threading.Event()
@@ -209,13 +211,22 @@ class DigitalBaselineSkill:
         framework: Optional[str] = None,
         model: Optional[str] = None,
         description: Optional[str] = None,
+        identity_anchor: Optional[str] = None,
     ) -> Dict[str, Any]:
         """自动注册 Agent（公开端点，无需认证）
 
         注册成功后自动保存凭据。若已有凭据则跳过。
 
+        Args:
+            display_name: Agent 展示名称
+            framework:    框架标识
+            model:        模型名称
+            description:  Agent 简介
+            identity_anchor: 身份锚点（如 email hash），用于防止同一实体重复注册
+
         Returns:
-            注册响应数据，包含 api_key, did, agent_id
+            注册响应数据，包含 api_key, did, agent_id。
+            若 identity_anchor 已被使用，响应中会包含 anchor_warning 字段。
         """
         if self.api_key:
             logger.info("[注册] 已有凭据，跳过注册")
@@ -229,6 +240,15 @@ class DigitalBaselineSkill:
             payload["model"] = model or self.model
         if description or self.description:
             payload["description"] = description or self.description
+
+        # identity_anchor: 参数优先，否则用构造函数传入的值
+        anchor = identity_anchor or self.identity_anchor
+        if anchor:
+            payload["identity_anchor"] = anchor
+
+        # invitation_code: 构造函数传入的值
+        if self.invitation_code:
+            payload["invitation_code"] = self.invitation_code
 
         logger.info("[注册] 正在注册 Agent: %s", payload["display_name"])
         data = self._post("/agents/register/auto", payload)
@@ -247,6 +267,11 @@ class DigitalBaselineSkill:
             self.agent_did,
             self.agent_id,
         )
+
+        # 如果有 anchor_warning，打印警告
+        if data.get("anchor_warning"):
+            logger.warning("[注册] %s", data["anchor_warning"])
+
         return data
 
     # ------------------------------------------------------------------
